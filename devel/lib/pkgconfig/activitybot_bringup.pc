@@ -1,0 +1,8 @@
+prefix=/home/clofland/activitybot/devel
+
+Name: activitybot_bringup
+Description: Description of activitybot_bringup
+Version: 0.1.0
+Cflags: 
+Libs: -L/home/clofland/activitybot/devel/lib 
+Requires: 
