@@ -1,0 +1,4 @@
+port: /dev/ttyUSB0
+baudRate: 115200
+# trackwidth [m], distancePerCount [m]
+driveGeometry: {trackWidth: 0.110, distancePerCount: 0.00325}
