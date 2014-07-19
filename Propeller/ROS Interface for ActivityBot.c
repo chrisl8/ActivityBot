@@ -54,6 +54,27 @@ static int pingRange0 = 0;
 void pollPingSensors(void *par); // Use a cog to fill range variables with ping distances
 static int pstack[256]; // If things get weird make this number bigger!
 
+// For Gyroscope - Declare everything globally
+unsigned char i2cAddr = 0x69;       //I2C Gyro address
+//L3G4200D register addresses & commads.
+//See device datasheet section 7 for more info.
+unsigned char devId  = 0x0f;        //Device ID
+unsigned char ctrl1  = 0x20;        //Control reg1
+unsigned char cfg1   = 0b00011111;   //100 hz, 25 cutoff, power up, axes enabled
+unsigned char ctrl2  = 0x21;
+unsigned char ctrl3  = 0x22;
+unsigned char cfg3   = 0b00001000;    //Enable data poling (I2_DRDY)
+unsigned char ctrl4  = 0x23;
+unsigned char cfg4   = 0b10000000;    //Block until read, big endian
+unsigned char status = 0x27;
+unsigned char xL     = 0x28;            //Reg for x low byte - Next 5 bytes xH, yL, yH, zL, xH
+unsigned char reply;                //Single byte reply
+char xyz[6];                        //XYZ dat array
+int gyroXvel, gyroYvel, gyroZvel;                       //Axis variables
+i2c *bus;                           //Declare I2C bus
+// Create a cog for polling the Gyro
+void pollGyro(void *par); // Use a cog to fill range variables with ping distances
+static int gyrostack[256]; // If things get weird make this number bigger!
 
 int main() {
 
@@ -64,6 +85,15 @@ int main() {
 	 broadcasting 'i' until it does to tell ROS that we
 	 are ready */
 	int robotInitialized = 0; // Do not compute odometry until we have the trackWidth and distancePerCount
+    
+    // For Debugging without ROS:
+    /*
+    trackWidth = 0.110;
+    distancePerCount = 0.00325;
+    robotInitialized = 1;
+    */
+    // Comment out above lines for use with ROS
+    
 	while (robotInitialized == 0) {
 		dprint(term, "i\t0\n"); // Request Robot distancePerCount and trackWidth NOTE: Python code cannot deal with a line with no divider characters on it.
 		pause(10); // Give ROS time to respond, but not too much or we bump into other stuff that may be coming in from ROS.
@@ -95,6 +125,21 @@ int main() {
     
     // Start the sensor cog(s)
 	cogstart(&pollPingSensors, NULL, pstack, sizeof pstack);
+
+    // Initialize Gyro in the main program
+  bus = i2c_newbus(5, 4, 0);        //New I2C bus SCL = P5, SDA = P4
+  int n;
+  n = i2c_out(bus, i2cAddr, ctrl3, 1, &cfg3, 1);
+  n += i2c_out(bus, i2cAddr, ctrl4, 1, &cfg4, 1);
+  n += i2c_out(bus, i2cAddr, ctrl1, 1, &cfg1, 1);
+  // Make sure Gyro initialized and stall if it did not.
+  if(n != 9)
+  {
+    print("Bytes should be 9, but was %d,", n);
+    while(1);
+  }
+  // Start Gyro polling in another cog  
+	cogstart(&pollGyro, NULL, gyrostack, sizeof gyrostack);
 
 	// Now initialize the Motors
 	// abdrive settings:
@@ -199,8 +244,7 @@ void displayTicks(void) {
 	double V = ((speedRight * distancePerCount) + (speedLeft * distancePerCount)) / 2;
 	double Omega = ((speedRight * distancePerCount) - (speedLeft * distancePerCount)) / trackWidth;
 
-	dprint(term, "o\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%d\n", X, Y, Heading, V, Omega, pingRange0); // Odometry for ROS
-    // Now with sensor ranges!!
+	dprint(term, "o\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%d\t%d\t%d\t%d\n", X, Y, Heading, V, Omega, pingRange0, gyroXvel, gyroYvel, gyroZvel); // Odometry for ROS
 }
 
 volatile int abd_speedL;
@@ -223,4 +267,31 @@ I don't know what would be ideal for a delay, but the maximum sound round-trip t
     */
   }
 
+}
+
+void pollGyro(void *par) {
+while(1) {
+    int ready = 0;                    //Wait until ready
+    while (!ready)
+    {
+      i2c_in(bus, i2cAddr, status, 1, &ready, 1);
+      ready = 1 & (ready >>= 3);
+    }
+
+    for(int i = 0; i < 6; i++)        //Get axis bytes
+    {
+      int regAddr = xL + i;
+      i2c_in(bus, i2cAddr, regAddr, 1, &xyz[i], 1);
+    }
+
+    //Bytes to int in Degrees Per Second (dps)
+    //"Dividing by 114 reduces noise"
+    // http://www.parallax.com/sites/default/files/downloads/27911-L3G4200D-Gyroscope-Application-Note.pdf
+    // 1 radian/second [rad/s] = 57.2957795130824 degree/second [°/s]
+    gyroXvel = (int) (short) ((xyz[1] << 8) + xyz[0]) / 114;
+    gyroYvel = (int) (short) ((xyz[3] << 8) + xyz[2]) / 114;
+    gyroZvel = (int) (short) ((xyz[5] << 8) + xyz[4]) / 114;
+
+    //pause(250); // Pause between reads, or do we need this? Should we read faster? The !ready loop should handle the Gyro's frequency right?
+}
 }

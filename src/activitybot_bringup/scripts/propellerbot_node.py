@@ -279,7 +279,7 @@ class PropellerComm(object):
         partsCount = len(lineParts)
 
         #rospy.logwarn(partsCount)
-        if (partsCount  < 6): # Just discard short lines, increment this as lines get longer
+        if (partsCount  < 10): # Just discard short lines, increment this as lines get longer
             pass
         
         try:
