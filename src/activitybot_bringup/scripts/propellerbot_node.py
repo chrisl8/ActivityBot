@@ -110,12 +110,12 @@ class PropellerComm(object):
         rospy.loginfo("Starting with serial port: " + port + ", baud rate: " + str(baudRate))
 
         # subscriptions
-        rospy.Subscriber("cmd_vel", Twist, self._HandleVelocityCommand)
-        rospy.Subscriber("cmd_vel_mux/input/teleop", Twist, self._HandleVelocityCommand)
+        rospy.Subscriber("cmd_vel", Twist, self._HandleVelocityCommand) # Is this line or the below bad redundancy?
+        rospy.Subscriber("cmd_vel_mux/input/teleop", Twist, self._HandleVelocityCommand) # IS this line or the above bad redundancy?
         self._SerialPublisher = rospy.Publisher('serial', String)
 
         # The Odometry Transform is done in/with the robot_pose_ekf now
-        #self._OdometryTransformBroadcaster = tf.TransformBroadcaster()
+        self._OdometryTransformBroadcaster = tf.TransformBroadcaster() # REMOVE this line if you use robot_pose_ekf
         self._OdometryPublisher = rospy.Publisher("odom", Odometry)
 
         # We don't need to broadcast a transform, as it is static and contained within the URDF files
@@ -141,7 +141,7 @@ class PropellerComm(object):
         #self.baudrate = rospy.get_param('~baudrate', self.default_baudrate)
         self.update_rate = rospy.get_param('~update_rate', self.default_update_rate)
         self.drive_mode = rospy.get_param('~drive_mode', 'twist')
-        self.has_gyro = rospy.get_param('~has_gyro', True) # Not sure if this does anything anymore
+        self.has_gyro = rospy.get_param('~has_gyro', False) # Not sure if this does anything anymore
         self.odom_angular_scale_correction = rospy.get_param('~odom_angular_scale_correction', 1.0)
         self.odom_linear_scale_correction = rospy.get_param('~odom_linear_scale_correction', 1.0)
         self.cmd_vel_timeout = rospy.Duration(rospy.get_param('~cmd_vel_timeout', 0.6))
@@ -172,23 +172,6 @@ class PropellerComm(object):
         self.sensor_state_pub = rospy.Publisher('~sensor_state', TurtlebotSensorState)
         self.operating_mode_srv = rospy.Service('~set_operation_mode', SetTurtlebotMode, self.set_operation_mode)
         self.digital_output_srv = rospy.Service('~set_digital_outputs', SetDigitalOutputs, self.set_digital_outputs)
-
-        '''
-        # This is from the Turtlebot node code.
-        # These drive input commands are handled elsewhere in
-        # the Propeller code. You can find it by searching for the cmd_vel subscription.
-        if self.drive_mode == 'twist':
-            self.cmd_vel_sub = rospy.Subscriber('cmd_vel', Twist, self.cmd_vel)
-            self.drive_cmd = self.robot.direct_drive
-        elif self.drive_mode == 'drive':
-            self.cmd_vel_sub = rospy.Subscriber('cmd_vel', Drive, self.cmd_vel)
-            self.drive_cmd = self.robot.drive
-        elif self.drive_mode == 'turtle':
-            self.cmd_vel_sub = rospy.Subscriber('cmd_vel', Turtle, self.cmd_vel)
-            self.drive_cmd = self.robot.direct_drive
-        else:
-            rospy.logerr("unknown drive mode :%s"%(self.drive_mode))
-        '''
 
         self.transform_broadcaster = None
         if self.publish_tf:
@@ -242,34 +225,6 @@ class PropellerComm(object):
         self.max_abs_yaw_vel = config['max_abs_yaw_vel']
         return config
 
-    def cmd_vel(self, msg): # This is the Turtlebot node drive code, not used by Propeller
-        # This could be interesting to study if we have trouble with ArloBot
-        # Clamp to min abs yaw velocity, to avoid trying to rotate at low
-        # speeds, which doesn't work well.
-        if self.min_abs_yaw_vel is not None and msg.angular.z != 0.0 and abs(msg.angular.z) < self.min_abs_yaw_vel:
-            msg.angular.z = self.min_abs_yaw_vel if msg.angular.z > 0.0 else -self.min_abs_yaw_vel
-        # Limit maximum yaw to avoid saturating the gyro
-        if self.max_abs_yaw_vel is not None and self.max_abs_yaw_vel > 0.0 and msg.angular.z != 0.0 and abs(msg.angular.z) > self.max_abs_yaw_vel: 
-            msg.angular.z = self.max_abs_yaw_vel if msg.angular.z > 0.0 else -self.max_abs_yaw_vel 
-        if self.drive_mode == 'twist':
-            # convert twist to direct_drive args
-            ts  = msg.linear.x * 1000 # m -> mm
-            tw  = msg.angular.z  * (robot_types.ROBOT_TYPES[self.robot_type].wheel_separation / 2) * 1000 
-            # Prevent saturation at max wheel speed when a compound command is sent.
-            if ts > 0:
-                ts = min(ts,   MAX_WHEEL_SPEED - abs(tw))
-            else:
-                ts = max(ts, -(MAX_WHEEL_SPEED - abs(tw)))
-            self.req_cmd_vel = int(ts - tw), int(ts + tw)
-        elif self.drive_mode == 'turtle':
-            # convert to direct_drive args
-            ts  = msg.linear * 1000 # m -> mm
-            tw  = msg.angular  * (robot_types.ROBOT_TYPES[self.robot_type].wheel_separation / 2) * 1000 
-            self.req_cmd_vel = int(ts - tw), int(ts + tw)
-        elif self.drive_mode == 'drive':
-            # convert twist to drive args, m->mm (velocity, radius)
-            self.req_cmd_vel = msg.velocity * 1000, msg.radius * 1000
-
     def _HandleReceivedLine(self,  line): # This is Propeller specific
         self._Counter = self._Counter + 1
         #rospy.logdebug(str(self._Counter) + " " + line)
@@ -320,15 +275,14 @@ class PropellerComm(object):
             # http://wiki.ros.org/tf/Tutorials/Writing%20a%20tf%20broadcaster%20%28Python%29
             # This is done in/with the robot_pose_ekf because it can integrate IMU/gyro data
             # using an "extended Kalman filter"
-            '''
+            # REMOVE this "line" if you use robot_pose_ekf
             self._OdometryTransformBroadcaster.sendTransform(
                 (x, y, 0), 
                 (quaternion.x, quaternion.y, quaternion.z, quaternion.w),
                 rosNow,
-                "base_link",
+                "base_footprint",
                 "odom"
                 )
-            '''
 
             # next, we'll publish the odometry message over ROS
             odometry = Odometry()
