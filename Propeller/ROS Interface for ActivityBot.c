@@ -29,6 +29,7 @@ http://forums.parallax.com/showthread.php/152636-Run-ActivityBot-C-Code-in-the-A
 fdserial *term;
 
 // Robot description: We will get this from ROS so that it is easier to tweak between runs without reloading the AB EEPROM.
+// http://learn.parallax.com/activitybot/calculating-angles-rotation
 static double distancePerCount = 0.0; // See encoders.yaml to set or change this value
 static double trackWidth = 0.0; // See encoders.yaml to set or change this value
 
@@ -71,6 +72,7 @@ unsigned char xL     = 0x28;            //Reg for x low byte - Next 5 bytes xH, 
 unsigned char reply;                //Single byte reply
 char xyz[6];                        //XYZ dat array
 int gyroXvel, gyroYvel, gyroZvel;                       //Axis variables
+static double gyroHeading = 0.0;
 i2c *bus;                           //Declare I2C bus
 // Create a cog for polling the Gyro
 void pollGyro(void *par); // Use a cog to fill range variables with ping distances
@@ -88,7 +90,7 @@ int main() {
     
     // For Debugging without ROS:
     /*
-    trackWidth = 0.110;
+    trackWidth = 0.1058; // http://learn.parallax.com/activitybot/calculating-angles-rotation
     distancePerCount = 0.00325;
     robotInitialized = 1;
     */
@@ -244,7 +246,8 @@ void displayTicks(void) {
 	double V = ((speedRight * distancePerCount) + (speedLeft * distancePerCount)) / 2;
 	double Omega = ((speedRight * distancePerCount) - (speedLeft * distancePerCount)) / trackWidth;
 
-	dprint(term, "o\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%d\t%d\t%d\t%d\n", X, Y, Heading, V, Omega, pingRange0, gyroXvel, gyroYvel, gyroZvel); // Odometry for ROS
+	// Odometry for ROS
+    dprint(term, "o\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%d\n", X, Y, Heading, gyroHeading, V, Omega, pingRange0);
 }
 
 volatile int abd_speedL;
@@ -288,10 +291,34 @@ while(1) {
     //"Dividing by 114 reduces noise"
     // http://www.parallax.com/sites/default/files/downloads/27911-L3G4200D-Gyroscope-Application-Note.pdf
     // 1 radian/second [rad/s] = 57.2957795130824 degree/second [°/s]
-    gyroXvel = (int) (short) ((xyz[1] << 8) + xyz[0]) / 114;
-    gyroYvel = (int) (short) ((xyz[3] << 8) + xyz[2]) / 114;
+    gyroXvel = (int) (short) ((xyz[1] << 8) + xyz[0]) / 114; // Perhaps use later to detect tipping?
+    gyroYvel = (int) (short) ((xyz[3] << 8) + xyz[2]) / 114; // Perhaps use later to detect tipping?
     gyroZvel = (int) (short) ((xyz[5] << 8) + xyz[4]) / 114;
+    
+    // If Gyro is running at 100Hz then time between readings should be 10 milliseconds
+    double deltaGyroHeading = 0.01 * gyroZvel * 2; // I'm not sure why I have to multiply by two, but I do.
+    deltaGyroHeading = deltaGyroHeading * PI / 180.0; // Convert to Radians
 
+    // Discard small variations when motors are not running to eliminate stationary drift
+    // Maybe this should be ANY time that speedLeft == speedRight? Then straight lines would stay straight, since
+    // ActivityBot appears to travel VERY good straight lines, but they seem to wobble in RVIZ at the moment.
+    if (speedLeft == 0 && speedRight == 0) {
+        if (deltaGyroHeading < 0.01) { // But accept large changes in case the robot is bumped or moved. Adjust as needed
+            deltaGyroHeading = 0.0;
+            }
+        }
+
+    gyroHeading += deltaGyroHeading;
+
+	// limit heading to -Pi <= heading < Pi
+	if (gyroHeading > PI) {
+		gyroHeading -= 2.0 * PI;
+	} else {
+		if (gyroHeading <= -PI) {
+			gyroHeading += 2.0 * PI;
+		}
+	}
+    
     //pause(250); // Pause between reads, or do we need this? Should we read faster? The !ready loop should handle the Gyro's frequency right?
 }
 }

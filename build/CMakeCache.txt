@@ -233,6 +233,12 @@ _CATKIN_GTEST_INCLUDE:FILEPATH=/usr/include/gtest/gtest.h
 _CATKIN_GTEST_SRC:FILEPATH=/usr/src/gtest/src/gtest.cc
 
 //Value Computed by CMake
+activitybot_BINARY_DIR:STATIC=/home/clofland/activitybot/build/activitybot
+
+//Value Computed by CMake
+activitybot_SOURCE_DIR:STATIC=/home/clofland/activitybot/src/activitybot
+
+//Value Computed by CMake
 activitybot_bringup_BINARY_DIR:STATIC=/home/clofland/activitybot/build/activitybot_bringup
 
 //Value Computed by CMake
