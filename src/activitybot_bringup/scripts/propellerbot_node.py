@@ -43,7 +43,7 @@ import sys
 from geometry_msgs.msg import Quaternion
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
-from sensor_msgs.msg import Imu
+#from sensor_msgs.msg import Imu
 from nav_msgs.msg import Odometry
 from std_msgs.msg import String
 #from activitybot.srv import *
@@ -67,8 +67,8 @@ class PropellerComm(object):
     Helper class for communicating with a Propeller board over serial port
     '''
 
-    CONTROLLER_INITIALIZING = 1;
-    CONTROLLER_IS_READY = 2;
+    #CONTROLLER_INITIALIZING = 1;
+    #CONTROLLER_IS_READY = 2;
 
     def __init__(self, port="/dev/ttyUSB0", baudrate=115200):
         '''
@@ -78,7 +78,7 @@ class PropellerComm(object):
         '''
 
         self.default_port = '/dev/ttyUSB0' # Note that the Propeller board must be plugged in BEFORE anything else to secure ttyUSB0
-        self.default_update_rate = 30.0
+        #self.default_update_rate = 30.0
 
         self.robot = Turtlebot()
         self.sensor_handler = None
@@ -125,7 +125,7 @@ class PropellerComm(object):
         # Gyro Publisher
         # Based on code in TurtleBot source:
         # ~/turtlebot/src/turtlebot_create/create_node/src/create_node/gyro.py
-        self._ImuPublisher = rospy.Publisher("imu/data", Imu)
+        #self._ImuPublisher = rospy.Publisher("imu/data", Imu)
         #self.imu_data = Imu(header=rospy.Header(frame_id="gyro_link"))
         #self.imu_data.orientation_covariance = [1e6, 0, 0, 0, 1e6, 0, 0, 0, 1e-6]
         #self.imu_data.angular_velocity_covariance = [1e6, 0, 0, 0, 1e6, 0, 0, 0, 1e-6]
@@ -139,7 +139,7 @@ class PropellerComm(object):
         self.port = rospy.get_param('~port', self.default_port)
         self.robot_type = rospy.get_param('~robot_type', 'create')
         #self.baudrate = rospy.get_param('~baudrate', self.default_baudrate)
-        self.update_rate = rospy.get_param('~update_rate', self.default_update_rate)
+        #self.update_rate = rospy.get_param('~update_rate', self.default_update_rate)
         self.drive_mode = rospy.get_param('~drive_mode', 'twist')
         self.has_gyro = rospy.get_param('~has_gyro', False) # Not sure if this does anything anymore
         self.odom_angular_scale_correction = rospy.get_param('~odom_angular_scale_correction', 1.0)
@@ -154,7 +154,7 @@ class PropellerComm(object):
         self.operate_mode = rospy.get_param('~operation_mode', 3)
 
         rospy.loginfo("serial port: %s"%(self.port))
-        rospy.loginfo("update_rate: %s"%(self.update_rate))
+        #rospy.loginfo("update_rate: %s"%(self.update_rate))
         rospy.loginfo("drive mode: %s"%(self.drive_mode))
         rospy.loginfo("has gyro: %s"%(self.has_gyro))
 
@@ -212,7 +212,7 @@ class PropellerComm(object):
         return SetDigitalOutputsResponse(True)
 
     def reconfigure(self, config, level):
-        self.update_rate = config['update_rate']
+        #self.update_rate = config['update_rate']
         self.drive_mode = config['drive_mode']
         self.has_gyro = config['has_gyro']
         if self.has_gyro:
@@ -301,21 +301,22 @@ class PropellerComm(object):
             #for Turtlebot stack from turtlebot_node.py
             # robot_pose_ekf needs these covariances and we may need to adjust them?
             # From: ~/turtlebot/src/turtlebot_create/create_node/src/create_node/covariances.py
-            ODOM_POSE_COVARIANCE = [1e-3, 0, 0, 0, 0, 0,
+            # This is not needed if not using robot_pose_ekf
+            '''
+            odometry.pose.covariance = [1e-3, 0, 0, 0, 0, 0,
                                     0, 1e-3, 0, 0, 0, 0,
                                     0, 0, 1e6, 0, 0, 0,
                                     0, 0, 0, 1e6, 0, 0,
                                     0, 0, 0, 0, 1e6, 0,
                                     0, 0, 0, 0, 0, 1e3]
-            odometry.pose.covariance = ODOM_POSE_COVARIANCE
 
-            ODOM_TWIST_COVARIANCE = [1e-3, 0, 0, 0, 0, 0,
+            odometry.twist.covariance = [1e-3, 0, 0, 0, 0, 0,
                                      0, 1e-3, 0, 0, 0, 0,
                                      0, 0, 1e6, 0, 0, 0,
                                      0, 0, 0, 1e6, 0, 0,
                                      0, 0, 0, 0, 1e6, 0,
                                      0, 0, 0, 0, 0, 1e3]
-            odometry.twist.covariance = ODOM_TWIST_COVARIANCE
+                                     '''
 
             self._OdometryPublisher.publish(odometry)
 
