@@ -279,7 +279,7 @@
 	  </joint>
 	
 	  <joint name="ping_array_joint" type="fixed">
-	    <origin xyz="0.065 0 0.05" rpy="0 0 0" />
+	    <origin xyz="0.18745 0 0.03695" rpy="0 0 0" />
 	    <parent link="base_link" />
 	    <child link="ping_sensor_array" />
 	  </joint>
@@ -287,9 +287,8 @@
 	  <link name="ping_sensor_array">
 	    <visual>
 	      <geometry>
-	        <box size="0.02 0.035 0.002" />
+	        <box size="0.0174 0.06 0.0644" />
 	      </geometry>
-	      <material name="Green" />
 	    </visual>
 	    <inertial>
 	      <mass value="0.001" />
@@ -300,6 +299,7 @@
 	    </inertial>
 	  </link>
   </xacro:macro>
+
   <xacro:macro name="turtlebot_standoff_5in" params="parent number x_loc y_loc z_loc">
     <joint name="standoff_5in_${number}_joint" type="fixed">
       <origin xyz="${x_loc} ${y_loc} ${z_loc}" rpy="0 0 0" />
